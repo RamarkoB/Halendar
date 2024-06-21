@@ -1,0 +1,444 @@
+@import url('https://fonts.googleapis.com/css2?family=Jost');
+
+body {
+    display: flex;
+    position: relative;
+    flex-direction: column;
+    overflow: hidden;
+    margin: 0;
+    font-family: 'Jost', sans-serif;
+}
+
+#modal {
+    position: absolute;
+    display: flex;
+    width: 100vw;
+    height: 100vh;
+    z-index: 3;
+    justify-content: center;
+    align-items: center;
+}
+
+#modalBackground {
+    height: 100%;
+    width: 100%;
+    background-color: black;
+    position: absolute;
+    opacity: 50%;
+    z-index: 3;
+}
+
+#modalDiv {
+    position: relative;
+    border-radius: 1.5rem;
+    background-color: white;
+    width: 80%;
+    height: 80%;
+    border: black solid 3px;
+    z-index: 4;
+    display: flex;
+    flex-direction: column;
+    font-size: large;
+}
+
+#modalTop {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    margin: 10px;
+}
+
+#modalMain {
+    width: 100%;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+#modalMain > div:not(#nameInput), #timeInput > div {
+    display: flex;
+    flex-direction: row!important;
+    justify-content: center;
+    justify-content: space-evenly;
+    margin-bottom: 15px;
+}
+
+#timeInput > div {
+    margin-bottom: 0;
+}
+
+input {
+    text-align: center;
+    font-size: large;
+    font-family: Jost;
+}
+
+input:invalid {
+    background-color: lightpink;
+}
+
+button {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 2rem;
+    background: black;
+    color: white;
+    border: transparent;
+    cursor: pointer;
+}
+#modal button {
+    font-family: Jost;
+    border-radius: .5rem;
+    margin-top: auto;
+    margin-bottom: auto;
+    font-size: large;
+    padding-left: 0.5em;
+    padding-right: 0.5em;
+}
+
+#modalTop button {
+    margin-right: 15px;
+}
+
+#buttons {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-evenly;
+    padding: 10px 20%;
+}
+
+#buttons > button:not(.active), .mButtons button:not(.active) {
+    background-color: white;
+    color: black;
+    border: black solid 1px;
+}
+
+#modalMain > div:not(:first-child) > div, #timeInput > div > div, #nameInput {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px;
+}
+
+#nameInput { 
+    margin-bottom: 15px;
+}
+
+#nameInput > input {
+    width: 50vw!important;
+}
+
+#modalMain > div:not(:first-child) input {
+    width: 3rem;
+}
+
+.mButtons button:first-child {
+    margin-bottom: 5px!important;
+}
+
+#done {
+    margin-left: auto;
+    margin-right: auto;
+    width: 50%;
+}
+
+#top {
+    height: 12vh;
+    border-bottom: solid black 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+h1 {
+    font-size: 6vh;
+    font-weight: 100;
+    margin: 0;
+}
+
+#bottom {
+    height: 88vh;
+    display: flex;
+    flex-direction: row;
+}
+
+#sidebar {
+    height: 100%;
+    width: 20%;
+    border-right: solid black 2px;
+}
+
+#week, #month {
+    height: 100%;
+    width: 80vw;
+}
+
+.event, .task, .allday {
+    --start: 0;
+    --length: 0;
+    --overlap: 0;
+    text-align: left;
+    background: black;
+    color: white;
+    border: white 1px solid;
+    border-radius: .5em;
+    margin: 5px;
+    width: calc(100% - 12px - var(--overlap) * 5px);;
+    text-align: left;
+    overflow-y: hidden;
+    left: calc(var(--overlap) * 5px);
+}
+
+.task {
+    background: white;
+    color: black;
+    border: black solid 1px;
+    overflow-y:visible;
+    height: fit-content;
+}
+
+.event > span, .task > span, .allday > span{
+    margin-left: 5px;
+    display: inline-block;
+}
+
+#month {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    grid-template-rows: .5fr;
+    grid-auto-rows: 1fr;
+}
+
+#month > div {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+    padding-top: 5px;
+    overflow-y: hidden;
+}
+
+#month > div:nth-child(-n + 7) {
+    justify-content: center;
+}
+
+#month .event, #month .task, #month .allday {
+    font-size: 12px;
+    height: 1.5em;
+    margin-top: 0px;
+    overflow-y: hidden;
+}
+
+#month > div::before {
+    content:'';
+    width:100%;
+    height:100%;    
+    position:absolute;
+    left:0;
+    top:0;
+    background:linear-gradient(transparent 60%, white);
+}
+
+#month > div:nth-child(even) {
+    background: #eee;
+}
+
+#month > div:nth-child(even)::before {
+    background:linear-gradient(transparent 60%, #eee);
+}
+
+#month > div > div > p {
+    color: white;
+    margin: 0;
+    margin-left: .5em;
+}
+
+.notNow {
+    color: lightgrey;
+}
+
+#dates {
+    display: flex;
+    flex-direction: row;
+    height: 15vh;
+}
+
+#timeline-top, #timeline-bottom {
+    width: 7.5%;
+}
+
+#timeline-top {
+    position: relative;
+}
+
+#timeline-top > button {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%,-50%);
+
+    border-radius: 50%;
+    
+    width: 2rem;
+    font-size: xx-large;
+}
+
+#days {
+    display: flex;
+    flex-direction: column;
+}
+
+#alldays {
+    display: flex;
+    flex-direction: row;
+    border-bottom: solid 1px #aaa;
+}
+
+#timeline-bottom {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-auto-rows: 1fr;
+}
+
+#timeline-bottom > div {
+    position: relative;
+    border-bottom-width: 1px;
+    border-bottom-style: solid;
+    border-image: linear-gradient(to left, grey, rgba(0, 0, 0, 0) 3.25em) 2;
+}
+
+#timeline-bottom > div > span {
+    position: absolute;
+    bottom: 1%;
+    right: 5%;
+}
+
+#line {
+    position: absolute!important;
+    top: var(--time);
+    border: red solid 1px!important;
+    width: 80vw;
+    z-index: 2;
+}
+
+#point {
+    position: absolute!important;
+    top: var(--time);
+    right: 0;
+    transform: translate(50%, calc(-50% + 1px));
+    border: 0 solid black!important;
+
+    background-color: red;
+    border-radius: 50%;
+    width: .5em;
+    height: .5em;
+    z-index: 2;
+}
+
+#dates > div:nth-child(n + 2), #alldays > div:nth-child(n + 2), #agenda > div > div:nth-child(n + 2) {
+    width: calc(92.5% / 7);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+    position: relative;
+    z-index: 1;
+}
+
+#dates > div:nth-child(even), #alldays > div:nth-child(odd), #agenda > div > div:nth-child(odd) {
+    background-color: #eee;
+}
+
+#agenda {
+    overflow-y: scroll;
+    overflow-x: hidden;
+    height: 73vh;
+}
+
+#agenda > div {
+    display: flex;
+    flex-direction: row;
+    height: 180vh;
+}
+
+#agenda > div > div {
+    position: relative;
+}
+
+#agenda .event {
+    position: absolute;
+    top: var(--start);
+    height: var(--length);
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+#agenda .task {
+    position: absolute;
+    top: var(--start);
+    height: fit-content;
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+h4 {
+    margin: 0;
+    font-size: 5vh;
+}
+
+#month div > span {
+    margin-bottom: 5px;
+}
+
+#month .today > span, #week .today > h4 {
+    color: white;
+    position: relative;
+}
+
+#month .today > span::before, #week .today > h4::before {
+    content:'';
+    display: block;
+    position: absolute;
+    left: 50%;
+    transform: translate(-50%, -2.5%);
+    background-color: black;
+    width: 1.5em;
+    height: 1.5em;
+    border-radius: 50%;
+    z-index: -1;
+}
+
+#tooSmall {
+    display: none;
+}
+
+@media (min-width: 800px) {
+    #sidebar {
+        display: none;
+    }
+
+    #week, #month, #line {
+        width: 100vw;
+    }
+}
+
+@media (max-width: 800px) {
+    #modal, #top, #bottom {
+        display: none;
+    }
+
+    #tooSmall {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        height: 100vh;
+    }
+
+    #tooSmall > h1 {
+        width: 75%;
+    }
+}
