@@ -1,0 +1,11 @@
+resolver: lts-14.27
+compiler: ghcjs-8.6.0.1
+compiler-check: match-exact
+
+packages:
+- .
+
+extra-deps:
+- miso-1.7.1.0
+
+allow-newer: true

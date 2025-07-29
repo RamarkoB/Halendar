@@ -1,0 +1,89 @@
+name: Build and Deploy Miso App
+
+on:
+    push:
+        branches: [main, master]
+    pull_request:
+        branches: [main, master]
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Setup Haskell Stack
+              uses: haskell/actions/setup@v2
+              with:
+                  ghc-version: '8.10.7'
+                  enable-stack: true
+                  stack-version: 'latest'
+
+            - name: Cache Stack dependencies
+              uses: actions/cache@v3
+              with:
+                  path: |
+                      ~/.stack
+                      .stack-work
+                  key: ${{ runner.os }}-stack-${{ hashFiles('stack.yaml') }}
+                  restore-keys: |
+                      ${{ runner.os }}-stack-
+
+            - name: Setup GHCJS
+              run: |
+                  stack setup --compiler ghcjs-8.6.0.1
+
+            - name: Build with GHCJS
+              run: |
+                  stack build --compiler ghcjs-8.6.0.1
+
+            - name: Find and copy compiled files
+              run: |
+                  # Find the .jsexe directory
+                  JSEXE_DIR=$(find .stack-work -name "*.jsexe" -type d | head -1)
+                  echo "Found JSEXE directory: $JSEXE_DIR"
+
+                  # Create output directory
+                  mkdir -p dist
+
+                  # Copy JavaScript files
+                  cp "$JSEXE_DIR/all.js" dist/ || cp "$JSEXE_DIR"/{rts.js,lib.js,out.js,runmain.js} dist/
+
+                  # Copy CSS if it exists
+                  [ -f cal.css ] && cp cal.css dist/
+
+                  # Create index.html
+                  cat > dist/index.html << 'EOF'
+                  <!DOCTYPE html>
+                  <html>
+                  <head>
+                      <meta charset="utf-8">
+                      <title>CalApp</title>
+                      <link rel="stylesheet" type="text/css" href="cal.css">
+                  </head>
+                  <body>
+                      <script language="javascript" src="rts.js"></script>
+                      <script language="javascript" src="lib.js"></script>
+                      <script language="javascript" src="out.js"></script>
+                      <script language="javascript" src="runmain.js" defer></script>
+                  </body>
+                  </html>
+                  EOF
+
+                  # List what we created
+                  ls -la dist/
+
+            - name: Upload build artifacts
+              uses: actions/upload-artifact@v3
+              with:
+                  name: miso-app-static
+                  path: dist/
+
+            # Optional: Deploy to GitHub Pages
+            - name: Deploy to GitHub Pages
+              if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+              uses: peaceiris/actions-gh-pages@v3
+              with:
+                  github_token: ${{ secrets.GITHUB_TOKEN }}
+                  publish_dir: ./dist
