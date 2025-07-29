@@ -17,38 +17,47 @@ jobs:
               uses: haskell/actions/setup@v2
               with:
                   ghc-version: '8.10.7'
+                  cabal-version: '3.6'
                   enable-stack: true
                   stack-version: 'latest'
 
-            - name: Cache Stack dependencies
+            - name: Cache dependencies
               uses: actions/cache@v4
               with:
                   path: |
                       ~/.stack
+                      ~/.cabal
                       .stack-work
-                  key: ${{ runner.os }}-stack-${{ hashFiles('stack.yaml') }}
+                  key: ${{ runner.os }}-haskell-${{ hashFiles('stack.yaml', 'calApp.cabal') }}
                   restore-keys: |
-                      ${{ runner.os }}-stack-
+                      ${{ runner.os }}-haskell-
 
-            - name: Setup GHCJS
+            - name: Install GHCJS
               run: |
-                  stack setup
+                  cabal update
+                  cabal install --lib ghcjs
+                  ghcjs-boot --dev
 
             - name: Build with GHCJS
               run: |
-                  stack build
+                  cabal configure --ghcjs
+                  cabal build
 
             - name: Find and copy compiled files
               run: |
-                  # Find the .jsexe directory
-                  JSEXE_DIR=$(find .stack-work -name "*.jsexe" -type d | head -1)
+                  # Find the .jsexe directory (cabal output location)
+                  JSEXE_DIR=$(find dist-newstyle -name "*.jsexe" -type d | head -1)
                   echo "Found JSEXE directory: $JSEXE_DIR"
 
                   # Create output directory
                   mkdir -p dist
 
                   # Copy JavaScript files
-                  cp "$JSEXE_DIR/all.js" dist/ || cp "$JSEXE_DIR"/{rts.js,lib.js,out.js,runmain.js} dist/
+                  if [ -f "$JSEXE_DIR/all.js" ]; then
+                    cp "$JSEXE_DIR/all.js" dist/
+                  else
+                    cp "$JSEXE_DIR"/{rts.js,lib.js,out.js,runmain.js} dist/
+                  fi
 
                   # Copy CSS if it exists
                   [ -f cal.css ] && cp cal.css dist/
@@ -63,10 +72,10 @@ jobs:
                       <link rel="stylesheet" type="text/css" href="cal.css">
                   </head>
                   <body>
-                      <script language="javascript" src="rts.js"></script>
-                      <script language="javascript" src="lib.js"></script>
-                      <script language="javascript" src="out.js"></script>
-                      <script language="javascript" src="runmain.js" defer></script>
+                      <script language="javascript" src="all.js"></script>
+                      <script language="javascript">
+                        h$main(h$mainZCZCMainzimain);
+                      </script>
                   </body>
                   </html>
                   EOF
