@@ -21,7 +21,7 @@ jobs:
                   stack-version: 'latest'
 
             - name: Cache Stack dependencies
-              uses: actions/cache@v3
+              uses: actions/cache@v4
               with:
                   path: |
                       ~/.stack
@@ -75,7 +75,7 @@ jobs:
                   ls -la dist/
 
             - name: Upload build artifacts
-              uses: actions/upload-artifact@v3
+              uses: actions/upload-artifact@v4
               with:
                   name: miso-app-static
                   path: dist/
