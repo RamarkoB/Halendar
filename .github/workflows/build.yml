@@ -1,98 +1,117 @@
 name: Build and Deploy Miso App
 
 on:
-    push:
-        branches: [main, master]
-    pull_request:
-        branches: [main, master]
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
 
 jobs:
-    build:
-        runs-on: ubuntu-latest
-
-        steps:
-            - uses: actions/checkout@v4
-
-            - name: Setup Haskell Stack
-              uses: haskell/actions/setup@v2
-              with:
-                  ghc-version: '8.10.7'
-                  cabal-version: '3.6'
-                  enable-stack: true
-                  stack-version: 'latest'
-
-            - name: Cache dependencies
-              uses: actions/cache@v4
-              with:
-                  path: |
-                      ~/.stack
-                      ~/.cabal
-                      .stack-work
-                  key: ${{ runner.os }}-haskell-${{ hashFiles('stack.yaml', 'calApp.cabal') }}
-                  restore-keys: |
-                      ${{ runner.os }}-haskell-
-
-            - name: Install GHCJS
-              run: |
-                  cabal update
-                  cabal install --lib ghcjs
-                  ghcjs-boot --dev
-
-            - name: Build with GHCJS
-              run: |
-                  cabal configure --ghcjs
-                  cabal build
-
-            - name: Find and copy compiled files
-              run: |
-                  # Find the .jsexe directory (cabal output location)
-                  JSEXE_DIR=$(find dist-newstyle -name "*.jsexe" -type d | head -1)
-                  echo "Found JSEXE directory: $JSEXE_DIR"
-
-                  # Create output directory
-                  mkdir -p dist
-
-                  # Copy JavaScript files
-                  if [ -f "$JSEXE_DIR/all.js" ]; then
-                    cp "$JSEXE_DIR/all.js" dist/
-                  else
-                    cp "$JSEXE_DIR"/{rts.js,lib.js,out.js,runmain.js} dist/
-                  fi
-
-                  # Copy CSS if it exists
-                  [ -f cal.css ] && cp cal.css dist/
-
-                  # Create index.html
-                  cat > dist/index.html << 'EOF'
-                  <!DOCTYPE html>
-                  <html>
-                  <head>
-                      <meta charset="utf-8">
-                      <title>CalApp</title>
-                      <link rel="stylesheet" type="text/css" href="cal.css">
-                  </head>
-                  <body>
-                      <script language="javascript" src="all.js"></script>
-                      <script language="javascript">
-                        h$main(h$mainZCZCMainzimain);
-                      </script>
-                  </body>
-                  </html>
-                  EOF
-
-                  # List what we created
-                  ls -la dist/
-
-            - name: Upload build artifacts
-              uses: actions/upload-artifact@v4
-              with:
-                  name: miso-app-static
-                  path: dist/
-
-            # Optional: Deploy to GitHub Pages
-            - name: Deploy to GitHub Pages
-              if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-              uses: peaceiris/actions-gh-pages@v3
-              with:
-                  github_token: ${{ secrets.GITHUB_TOKEN }}
-                  publish_dir: ./dist
+  build:
+    runs-on: ubuntu-latest
+    container: 
+      image: fpco/stack-build:lts-14.27
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Node.js (for GHCJS)
+      run: |
+        curl -fsSL https://deb.nodesource.com/setup_16.x | bash -
+        apt-get install -y nodejs
+    
+    - name: Cache dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.stack
+          ~/.cabal
+        key: ${{ runner.os }}-haskell-lts14-${{ hashFiles('**/*.cabal') }}
+        restore-keys: |
+          ${{ runner.os }}-haskell-lts14-
+    
+    - name: Install GHCJS via Stack
+      run: |
+        echo "resolver: lts-14.27" > stack.yaml
+        echo "packages: [.]" >> stack.yaml
+        echo "extra-deps: [miso-1.7.1.0]" >> stack.yaml
+        echo "compiler: ghcjs-8.6.0.1" >> stack.yaml
+        
+        # Install GHCJS the old way
+        stack setup --install-ghc
+        stack exec -- ghcjs-boot --dev
+        
+    - name: Build with GHCJS
+      run: |
+        stack build
+        
+    - name: Find and copy compiled files
+      run: |
+        # Find the .jsexe directory (Stack output location)
+        JSEXE_DIR=$(find .stack-work -name "*.jsexe" -type d | head -1)
+        echo "Found JSEXE directory: $JSEXE_DIR"
+        
+        # Create output directory
+        mkdir -p dist
+        
+        # Copy JavaScript files
+        if [ -f "$JSEXE_DIR/all.js" ]; then
+          cp "$JSEXE_DIR/all.js" dist/
+          # Create HTML for all.js
+          cat > dist/index.html << 'EOF'
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>CalApp</title>
+    <link rel="stylesheet" type="text/css" href="cal.css">
+</head>
+<body>
+    <script language="javascript" src="all.js"></script>
+    <script language="javascript">
+      h$main(h$mainZCZCMainzimain);
+    </script>
+</body>
+</html>
+EOF
+        else
+          # Copy individual files
+          cp "$JSEXE_DIR"/{rts.js,lib.js,out.js,runmain.js} dist/ 2>/dev/null || true
+          # Create HTML for separate files
+          cat > dist/index.html << 'EOF'
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>CalApp</title>
+    <link rel="stylesheet" type="text/css" href="cal.css">
+</head>
+<body>
+    <script language="javascript" src="rts.js"></script>
+    <script language="javascript" src="lib.js"></script>
+    <script language="javascript" src="out.js"></script>
+    <script language="javascript" src="runmain.js" defer></script>
+</body>
+</html>
+EOF
+        fi
+        
+        # Copy CSS if it exists
+        [ -f cal.css ] && cp cal.css dist/
+        
+        # List what we created
+        ls -la dist/
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: miso-app-static
+        path: dist/
+    
+    # Optional: Deploy to GitHub Pages
+    - name: Deploy to GitHub Pages
+      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./dist
