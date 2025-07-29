@@ -8,17 +8,22 @@ on:
 
 jobs:
     build:
-        runs-on: ubuntu-latest
-        container:
-            image: fpco/stack-build:lts-14.27
+        runs-on: ubuntu-20.04
 
         steps:
             - uses: actions/checkout@v4
 
+            - name: Setup Haskell
+              uses: haskell/actions/setup@v2
+              with:
+                  ghc-version: '8.10.7'
+                  cabal-version: '3.6'
+                  stack-version: '2.7.5'
+
             - name: Install Node.js (for GHCJS)
-              run: |
-                  curl -fsSL https://deb.nodesource.com/setup_16.x | bash -
-                  apt-get install -y nodejs
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '16'
 
             - name: Cache dependencies
               uses: actions/cache@v4
@@ -26,18 +31,26 @@ jobs:
                   path: |
                       ~/.stack
                       ~/.cabal
-                  key: ${{ runner.os }}-haskell-lts14-${{ hashFiles('**/*.cabal') }}
+                      .stack-work
+                  key: ${{ runner.os }}-haskell-lts14-${{ hashFiles('**/*.cabal', 'stack.yaml') }}
                   restore-keys: |
                       ${{ runner.os }}-haskell-lts14-
 
             - name: Install GHCJS via Stack
               run: |
-                  echo "resolver: lts-14.27" > stack.yaml
-                  echo "packages: [.]" >> stack.yaml
-                  echo "extra-deps: [miso-1.7.1.0]" >> stack.yaml
-                  echo "compiler: ghcjs-8.6.0.1" >> stack.yaml
+                  # Create stack.yaml with older resolver that supports GHCJS
+                  cat > stack.yaml << 'STACKEND'
+                  resolver: lts-14.27
+                  packages:
+                  - .
+                  extra-deps:
+                  - miso-1.7.1.0
+                  compiler: ghcjs-8.6.0.1
+                  compiler-check: match-exact
+                  allow-newer: true
+                  STACKEND
 
-                  # Install GHCJS the old way
+                  # Setup Stack and GHCJS
                   stack setup --install-ghc
                   stack exec -- ghcjs-boot --dev
 
