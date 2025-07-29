@@ -32,11 +32,11 @@ jobs:
 
             - name: Setup GHCJS
               run: |
-                  stack setup --compiler ghcjs-8.6.0.1
+                  stack setup
 
             - name: Build with GHCJS
               run: |
-                  stack build --compiler ghcjs-8.6.0.1
+                  stack build
 
             - name: Find and copy compiled files
               run: |
