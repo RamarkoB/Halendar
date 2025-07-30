@@ -44,7 +44,7 @@ jobs:
               run: |
                   # Set timeout to 1 hour and show concise progress
                   echo "Starting Nix build (timeout: 60 minutes)..."
-                  timeout 60m nix-build --cores 2 --max-jobs 2 --no-build-output --keep-going 2>&1 | \
+                  nix-build --cores 2 --max-jobs 2 --no-build-output --keep-going 2>&1 | \
                   grep -E "(building|copying|fetching)" | \
                   sed 's/^these .* will be built:/Building packages:/' | \
                   sed 's/^building '\''\/nix\/store\/[^-]*-/Building: /' | \
