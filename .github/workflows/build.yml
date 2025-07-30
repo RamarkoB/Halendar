@@ -8,105 +8,101 @@ on:
 
 jobs:
     build:
-        runs-on: ubuntu-20.04
+        runs-on: ubuntu-latest
 
         steps:
             - uses: actions/checkout@v4
 
-            - name: Setup Haskell
-              uses: haskell/actions/setup@v2
+            - name: Setup Nix
+              uses: cachix/install-nix-action@v22
               with:
-                  ghc-version: '8.10.7'
-                  cabal-version: '3.6'
-                  stack-version: '2.7.5'
+                  nix_path: nixpkgs=channel:nixos-unstable
 
-            - name: Install Node.js (for GHCJS)
-              uses: actions/setup-node@v4
+            - name: Setup Cachix
+              uses: cachix/cachix-action@v12
               with:
-                  node-version: '16'
+                  name: miso-haskell
+                  authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+                  skipPush: true
 
-            - name: Cache dependencies
-              uses: actions/cache@v4
-              with:
-                  path: |
-                      ~/.stack
-                      ~/.cabal
-                      .stack-work
-                  key: ${{ runner.os }}-haskell-lts14-${{ hashFiles('**/*.cabal', 'stack.yaml') }}
-                  restore-keys: |
-                      ${{ runner.os }}-haskell-lts14-
-
-            - name: Install GHCJS via Stack
+            - name: Create Nix build file
               run: |
-                  # Create stack.yaml with older resolver that supports GHCJS
-                  cat > stack.yaml << 'STACKEND'
-                  resolver: lts-14.27
-                  packages:
-                  - .
-                  extra-deps:
-                  - miso-1.7.1.0
-                  compiler: ghcjs-8.6.0.1
-                  compiler-check: match-exact
-                  allow-newer: true
-                  STACKEND
+                  cat > default.nix << 'NIXEND'
+                  { pkgs ? import <nixpkgs> {} }:
 
-                  # Setup Stack and GHCJS
-                  stack setup --install-ghc
-                  stack exec -- ghcjs-boot --dev
+                  let
+                    inherit (pkgs) lib;
+                    
+                    haskellPackages = pkgs.haskell.packages.ghcjs86;
+                    
+                    # Override miso to use a working version
+                    miso = haskellPackages.callCabal2nix "miso" (pkgs.fetchFromGitHub {
+                      owner = "dmjio";
+                      repo = "miso";
+                      rev = "v1.8.4.0";
+                      sha256 = "sha256-VU3Au8hMOkWFBaUjVt8e8oTjbhL3RqW5MKGxfJvNI2Q=";
+                    }) {};
+                    
+                  in haskellPackages.callCabal2nix "calApp" ./. {
+                    inherit miso;
+                  }
+                  NIXEND
 
-            - name: Build with GHCJS
+            - name: Build with Nix
               run: |
-                  stack build
+                  # Set timeout to prevent hanging
+                  timeout 30m nix-build --cores 2 --max-jobs 2
 
-            - name: Find and copy compiled files
+            - name: Copy build artifacts
               run: |
-                  # Find the .jsexe directory (Stack output location)
-                  JSEXE_DIR=$(find .stack-work -name "*.jsexe" -type d | head -1)
+                  # Find the built JavaScript
+                  if [ -d "result/bin" ]; then
+                    JSEXE_DIR=$(find result/bin -name "*.jsexe" -type d | head -1)
+                  else
+                    JSEXE_DIR=$(find result -name "*.jsexe" -type d | head -1)
+                  fi
+
                   echo "Found JSEXE directory: $JSEXE_DIR"
 
                   # Create output directory
                   mkdir -p dist
 
-                  # Copy JavaScript files and create appropriate HTML
+                  # Copy JavaScript files
                   if [ -f "$JSEXE_DIR/all.js" ]; then
                     cp "$JSEXE_DIR/all.js" dist/
-                    # Create index.html for all.js version
-                    cat > dist/index.html << 'HTMLEND'
-                  <!DOCTYPE html>
-                  <html>
-                  <head>
-                      <meta charset="utf-8">
-                      <title>CalApp</title>
-                      <link rel="stylesheet" type="text/css" href="cal.css">
-                  </head>
-                  <body>
-                      <script language="javascript" src="all.js"></script>
-                      <script language="javascript">
-                        h$main(h$mainZCZCMainzimain);
-                      </script>
-                  </body>
-                  </html>
-                  HTMLEND
+                    # Create simple HTML using printf to avoid heredoc issues
+                    printf '%s\n' \
+                      '<!DOCTYPE html>' \
+                      '<html>' \
+                      '<head>' \
+                      '    <meta charset="utf-8">' \
+                      '    <title>CalApp</title>' \
+                      '</head>' \
+                      '<body>' \
+                      '    <div id="app"></div>' \
+                      '    <script src="all.js"></script>' \
+                      '    <script>h$main(h$mainZCZCMainzimain);</script>' \
+                      '</body>' \
+                      '</html>' > dist/index.html
                   else
                     # Copy individual files
-                    cp "$JSEXE_DIR"/{rts.js,lib.js,out.js,runmain.js} dist/ 2>/dev/null || true
-                    # Create index.html for separate files version
-                    cat > dist/index.html << 'HTMLEND2'
-                  <!DOCTYPE html>
-                  <html>
-                  <head>
-                      <meta charset="utf-8">
-                      <title>CalApp</title>
-                      <link rel="stylesheet" type="text/css" href="cal.css">
-                  </head>
-                  <body>
-                      <script language="javascript" src="rts.js"></script>
-                      <script language="javascript" src="lib.js"></script>
-                      <script language="javascript" src="out.js"></script>
-                      <script language="javascript" src="runmain.js" defer></script>
-                  </body>
-                  </html>
-                  HTMLEND2
+                    cp "$JSEXE_DIR"/*.js dist/ 2>/dev/null || true
+                    # Create HTML for separate files using printf
+                    printf '%s\n' \
+                      '<!DOCTYPE html>' \
+                      '<html>' \
+                      '<head>' \
+                      '    <meta charset="utf-8">' \
+                      '    <title>CalApp</title>' \
+                      '</head>' \
+                      '<body>' \
+                      '    <div id="app"></div>' \
+                      '    <script src="rts.js"></script>' \
+                      '    <script src="lib.js"></script>' \
+                      '    <script src="out.js"></script>' \
+                      '    <script src="runmain.js"></script>' \
+                      '</body>' \
+                      '</html>' > dist/index.html
                   fi
 
                   # Copy CSS if it exists
@@ -114,7 +110,7 @@ jobs:
                     cp cal.css dist/
                   fi
 
-                  # List what we created
+                  # List contents
                   ls -la dist/
 
             - name: Upload build artifacts
