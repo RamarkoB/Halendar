@@ -42,15 +42,26 @@ jobs:
 
             - name: Build with Nix
               run: |
-                  # Build without time limit and show concise progress
+                  # Build without time limit and show all output to debug
                   echo "Starting Nix build (no timeout)..."
-                  nix-build --cores 2 --max-jobs 2 --no-build-output --keep-going 2>&1 | \
-                  grep -E "(building|copying|fetching)" | \
-                  sed 's/^these .* will be built:/Building packages:/' | \
-                  sed 's/^building '\''\/nix\/store\/[^-]*-/Building: /' | \
-                  sed 's/\.drv'\''\.\.\.$//' | \
-                  sed 's/^copying path.*from/Downloaded from cache:/' || \
-                  echo "Build completed"
+                  echo "=== Nix expression content ==="
+                  cat default.nix
+                  echo "=== Cabal file content ==="
+                  cat calApp.cabal
+                  echo "=== Starting build ==="
+                  nix-build --keep-going || {
+                    echo "Build failed, checking for any partial results..."
+                    ls -la
+                    exit 1
+                  }
+                  echo "=== Build completed, checking result ==="
+                  if [ -L result ]; then
+                    echo "Result symlink found:"
+                    ls -la result
+                    find result -type f | head -20
+                  else
+                    echo "No result symlink created - build may have failed silently"
+                  fi
 
             - name: Copy build artifacts
               run: |
