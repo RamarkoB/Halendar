@@ -16,13 +16,13 @@ jobs:
             - name: Setup Nix
               uses: cachix/install-nix-action@v22
               with:
-                  nix_path: nixpkgs=channel:nixos-unstable
+                  # Use a specific nixpkgs version that has working GHCJS
+                  nix_path: nixpkgs=channel:nixos-22.11
 
-            - name: Setup Cachix
+            - name: Setup Cachix (optional, for faster builds)
               uses: cachix/cachix-action@v12
               with:
                   name: miso-haskell
-                  authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
                   skipPush: true
 
             - name: Create Nix build file
@@ -31,21 +31,12 @@ jobs:
                   { pkgs ? import <nixpkgs> {} }:
 
                   let
-                    inherit (pkgs) lib;
+                    # Use a specific working GHCJS version
+                    haskellPackages = pkgs.haskell.packages.ghcjs;
                     
-                    haskellPackages = pkgs.haskell.packages.ghcjs86;
+                    # Use miso from nixpkgs
                     
-                    # Override miso to use a working version
-                    miso = haskellPackages.callCabal2nix "miso" (pkgs.fetchFromGitHub {
-                      owner = "dmjio";
-                      repo = "miso";
-                      rev = "v1.8.4.0";
-                      sha256 = "sha256-VU3Au8hMOkWFBaUjVt8e8oTjbhL3RqW5MKGxfJvNI2Q=";
-                    }) {};
-                    
-                  in haskellPackages.callCabal2nix "calApp" ./. {
-                    inherit miso;
-                  }
+                  in haskellPackages.callCabal2nix "calApp" ./. {}
                   NIXEND
 
             - name: Build with Nix
