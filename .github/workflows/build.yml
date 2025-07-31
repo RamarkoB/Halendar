@@ -16,8 +16,8 @@ jobs:
             - name: Setup Nix
               uses: cachix/install-nix-action@v22
               with:
-                  # Use nixos-23.05 which has better GHCJS support
-                  nix_path: nixpkgs=channel:nixos-23.05
+                  # Use nixos-23.11 which has more stable GHCJS
+                  nix_path: nixpkgs=channel:nixos-23.11
 
             - name: Setup Cachix
               uses: cachix/cachix-action@v12
@@ -32,20 +32,30 @@ jobs:
                   { pkgs ? import <nixpkgs> {} }:
 
                   let
-                    # Use the miso overlay for better GHCJS compatibility
-                    misoOverlay = import (pkgs.fetchFromGitHub {
-                      owner = "dmjio";
-                      repo = "miso";
-                      rev = "v1.8.3.0";
-                      sha256 = "sha256-VGPPiXEe2A2SfYxlXCzRnYl1k1Cn6+bRRPzHIXs2CNs=";
+                    # Use a pinned version of nixpkgs that we know works with GHCJS
+                    pinnedPkgs = import (pkgs.fetchFromGitHub {
+                      owner = "NixOS";
+                      repo = "nixpkgs";
+                      rev = "23.11";
+                      sha256 = "sha256-2jJXFg2k4V2qDOldP2bT4Q5EL5vRJYfUU1KObPBf2Tw=";
                     }) {};
                     
-                    pkgsWithMiso = pkgs.extend misoOverlay;
+                    # Use the stable ghcjs from the pinned nixpkgs
+                    haskellPackages = pinnedPkgs.haskell.packages.ghcjs;
                     
-                    # Use ghcjs86 which is more stable
-                    haskellPackages = pkgsWithMiso.haskell.packages.ghcjs86;
+                    # Override miso to use a working version
+                    misoPackage = haskellPackages.callHackageDirect {
+                      pkg = "miso";
+                      ver = "1.8.2.0";
+                      sha256 = "sha256-VhwrS2gOKyHLCFkAkswtC6KkYUl8hzxPGzEGIBpTT3U=";
+                    } {};
                     
-                  in haskellPackages.callCabal2nix "calApp" ./. {}
+                    # Create the package set with our miso override
+                    packageSet = haskellPackages.extend (self: super: {
+                      miso = misoPackage;
+                    });
+                    
+                  in packageSet.callCabal2nix "calApp" ./. {}
                   NIXEND
 
             - name: Build with Nix
