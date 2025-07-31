@@ -35,19 +35,10 @@ jobs:
                     # Use the standard GHCJS packages from nixpkgs
                     haskellPackages = pkgs.haskell.packages.ghcjs;
                     
-                    # Override miso to use version 1.8.2.0 from Hackage
-                    misoPackage = haskellPackages.callHackageDirect {
-                      pkg = "miso";
-                      ver = "1.8.2.0";
-                      sha256 = "sha256-VhwrS2gOKyHLCFkAkswtC6KkYUl8hzxPGzEGIBpTT3U=";
-                    } {};
-                    
-                    # Create the package set with our miso override
-                    packageSet = haskellPackages.extend (self: super: {
-                      miso = misoPackage;
-                    });
-                    
-                  in packageSet.callCabal2nix "calApp" ./. {}
+                  in haskellPackages.callCabal2nix "calApp" ./. {
+                    # Explicitly disable jsaddle flag to avoid broken dependency
+                    jsaddle = false;
+                  }
                   NIXEND
 
             - name: Build with Nix
