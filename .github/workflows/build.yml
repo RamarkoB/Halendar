@@ -35,10 +35,10 @@ jobs:
                     # Use the standard GHCJS packages from nixpkgs
                     haskellPackages = pkgs.haskell.packages.ghcjs;
                     
-                  in haskellPackages.callCabal2nix "calApp" ./. {
-                    # Explicitly disable jsaddle flag to avoid broken dependency
-                    jsaddle = false;
-                  }
+                    # Build the package with flags disabled
+                    package = haskellPackages.callCabal2nix "calApp" ./. {};
+                    
+                  in pkgs.haskell.lib.disableCabalFlag package "jsaddle"
                   NIXEND
 
             - name: Build with Nix
