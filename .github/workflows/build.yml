@@ -16,8 +16,8 @@ jobs:
             - name: Setup Nix
               uses: cachix/install-nix-action@v22
               with:
-                  # Use a specific nixpkgs version that has working GHCJS
-                  nix_path: nixpkgs=channel:nixos-22.11
+                  # Use nixos-23.05 which has better GHCJS support
+                  nix_path: nixpkgs=channel:nixos-23.05
 
             - name: Setup Cachix
               uses: cachix/cachix-action@v12
@@ -32,126 +32,111 @@ jobs:
                   { pkgs ? import <nixpkgs> {} }:
 
                   let
-                    # Use a specific working GHCJS version
-                    haskellPackages = pkgs.haskell.packages.ghcjs;
+                    # Use the miso overlay for better GHCJS compatibility
+                    misoOverlay = import (pkgs.fetchFromGitHub {
+                      owner = "dmjio";
+                      repo = "miso";
+                      rev = "v1.8.3.0";
+                      sha256 = "sha256-VGPPiXEe2A2SfYxlXCzRnYl1k1Cn6+bRRPzHIXs2CNs=";
+                    }) {};
                     
-                    # Use miso from nixpkgs
+                    pkgsWithMiso = pkgs.extend misoOverlay;
+                    
+                    # Use ghcjs86 which is more stable
+                    haskellPackages = pkgsWithMiso.haskell.packages.ghcjs86;
                     
                   in haskellPackages.callCabal2nix "calApp" ./. {}
                   NIXEND
 
             - name: Build with Nix
               run: |
-                  # Build without time limit and show all output to debug
-                  echo "Starting Nix build (no timeout)..."
-                  echo "=== Nix expression content ==="
-                  cat default.nix
-                  echo "=== Cabal file content ==="
-                  cat calApp.cabal
-                  echo "=== Starting build ==="
-                  nix-build --keep-going || {
-                    echo "Build failed, checking for any partial results..."
-                    ls -la
-                    exit 1
-                  }
-                  echo "=== Build completed, checking result ==="
-                  if [ -L result ]; then
-                    echo "Result symlink found:"
-                    ls -la result
-                    find result -type f | head -20
+                  echo "Starting Nix build..."
+                  timeout 30m nix-build --option sandbox false --max-jobs 1 --quiet 2>&1 | \
+                  while IFS= read -r line; do
+                    # Only show lines that indicate progress or errors
+                    if echo "$line" | grep -E "(building|copying|patching|configuring|Setup:|error:|warning:|CallStack|fatal:|failed)" > /dev/null; then
+                      echo "$line"
+                    fi
+                  done
+
+                  BUILD_EXIT_CODE=${PIPESTATUS[0]}
+
+                  if [ $BUILD_EXIT_CODE -eq 0 ]; then
+                    echo "Build completed successfully!"
                   else
-                    echo "No result symlink created - build may have failed silently"
+                    echo "Build failed with exit code $BUILD_EXIT_CODE"
+                    exit 1
                   fi
 
             - name: Copy build artifacts
               run: |
-                  echo "=== Debugging: Looking for build output ==="
-                  ls -la
-
-                  # Check if nix-build created a result symlink
-                  if [ -L "result" ]; then
-                    echo "Found result symlink, exploring..."
-                    ls -la result/
-                    find result -name "*.jsexe" -o -name "*.js" | head -10
-                  fi
-
-                  # Also check for any .jsexe directories anywhere
-                  echo "Searching for .jsexe directories..."
-                  find . -name "*.jsexe" -type d 2>/dev/null | head -5
-
-                  # Check if the cabal file was processed
-                  echo "Checking for any JavaScript files..."
-                  find . -name "*.js" 2>/dev/null | head -10
-
-                  # Create output directory
+                  echo "Looking for build output..."
                   mkdir -p dist
 
-                  # Try to find JavaScript output in various locations
+                  # Find JavaScript output
                   JSEXE_DIR=""
                   if [ -L "result" ]; then
                     JSEXE_DIR=$(find result -name "*.jsexe" -type d 2>/dev/null | head -1)
                   fi
 
-                  if [ -z "$JSEXE_DIR" ]; then
-                    JSEXE_DIR=$(find . -name "*.jsexe" -type d 2>/dev/null | head -1)
-                  fi
-
-                  echo "Found JSEXE directory: $JSEXE_DIR"
-
                   if [ -n "$JSEXE_DIR" ] && [ -d "$JSEXE_DIR" ]; then
-                    echo "Contents of JSEXE directory:"
-                    ls -la "$JSEXE_DIR"
+                    echo "Found JSEXE directory: $JSEXE_DIR"
                     
                     # Copy JavaScript files
                     if [ -f "$JSEXE_DIR/all.js" ]; then
                       cp "$JSEXE_DIR/all.js" dist/
-                      printf '%s\n' \
-                        '<!DOCTYPE html>' \
-                        '<html>' \
-                        '<head>' \
-                        '    <meta charset="utf-8">' \
-                        '    <title>CalApp</title>' \
-                        '</head>' \
-                        '<body>' \
-                        '    <div id="app"></div>' \
-                        '    <script src="all.js"></script>' \
-                        '    <script>h$main(h$mainZCZCMainzimain);</script>' \
-                        '</body>' \
-                        '</html>' > dist/index.html
+                      cat > dist/index.html << 'EOF'
+                  <!DOCTYPE html>
+                  <html>
+                  <head>
+                      <meta charset="utf-8">
+                      <title>CalApp</title>
+                      <link rel="stylesheet" href="cal.css">
+                  </head>
+                  <body>
+                      <div id="app"></div>
+                      <script src="all.js"></script>
+                      <script>h$main(h$mainZCZCMainzimain);</script>
+                  </body>
+                  </html>
+                  EOF
                     else
                       # Copy individual files
-                      cp "$JSEXE_DIR"/*.js dist/ 2>/dev/null || true
-                      printf '%s\n' \
-                        '<!DOCTYPE html>' \
-                        '<html>' \
-                        '<head>' \
-                        '    <meta charset="utf-8">' \
-                        '    <title>CalApp</title>' \
-                        '</head>' \
-                        '<body>' \
-                        '    <div id="app"></div>' \
-                        '    <script src="rts.js"></script>' \
-                        '    <script src="lib.js"></script>' \
-                        '    <script src="out.js"></script>' \
-                        '    <script src="runmain.js"></script>' \
-                        '</body>' \
-                        '</html>' > dist/index.html
+                      cp "$JSEXE_DIR"/*.js dist/ || true
+                      cat > dist/index.html << 'EOF'
+                  <!DOCTYPE html>
+                  <html>
+                  <head>
+                      <meta charset="utf-8">
+                      <title>CalApp</title>
+                      <link rel="stylesheet" href="cal.css">
+                  </head>
+                  <body>
+                      <div id="app"></div>
+                      <script src="rts.js"></script>
+                      <script src="lib.js"></script>
+                      <script src="out.js"></script>
+                      <script src="runmain.js"></script>
+                  </body>
+                  </html>
+                  EOF
                     fi
                   else
-                    echo "No JSEXE directory found, creating placeholder..."
-                    printf '%s\n' \
-                      '<!DOCTYPE html>' \
-                      '<html>' \
-                      '<head>' \
-                      '    <meta charset="utf-8">' \
-                      '    <title>CalApp - Build Issue</title>' \
-                      '</head>' \
-                      '<body>' \
-                      '    <h1>CalApp</h1>' \
-                      '    <p>Build completed but JavaScript output not found.</p>' \
-                      '    <p>Check the GitHub Actions logs for details.</p>' \
-                      '</body>' \
-                      '</html>' > dist/index.html
+                    echo "No JSEXE directory found"
+                    cat > dist/index.html << 'EOF'
+                  <!DOCTYPE html>
+                  <html>
+                  <head>
+                      <meta charset="utf-8">
+                      <title>CalApp - Build Issue</title>
+                  </head>
+                  <body>
+                      <h1>CalApp</h1>
+                      <p>Build completed but JavaScript output not found.</p>
+                      <p>Check the GitHub Actions logs for details.</p>
+                  </body>
+                  </html>
+                  EOF
                   fi
 
                   # Copy CSS if it exists
@@ -159,8 +144,7 @@ jobs:
                     cp cal.css dist/
                   fi
 
-                  # List final contents
-                  echo "=== Final dist/ contents ==="
+                  echo "Final dist/ contents:"
                   ls -la dist/
 
             - name: Upload build artifacts
