@@ -32,18 +32,10 @@ jobs:
                   { pkgs ? import <nixpkgs> {} }:
 
                   let
-                    # Use a pinned version of nixpkgs that we know works with GHCJS
-                    pinnedPkgs = import (pkgs.fetchFromGitHub {
-                      owner = "NixOS";
-                      repo = "nixpkgs";
-                      rev = "23.11";
-                      sha256 = "sha256-2jJXFg2k4V2qDOldP2bT4Q5EL5vRJYfUU1KObPBf2Tw=";
-                    }) {};
+                    # Use the standard GHCJS packages from nixpkgs
+                    haskellPackages = pkgs.haskell.packages.ghcjs;
                     
-                    # Use the stable ghcjs from the pinned nixpkgs
-                    haskellPackages = pinnedPkgs.haskell.packages.ghcjs;
-                    
-                    # Override miso to use a working version
+                    # Override miso to use version 1.8.2.0 from Hackage
                     misoPackage = haskellPackages.callHackageDirect {
                       pkg = "miso";
                       ver = "1.8.2.0";
