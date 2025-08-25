@@ -1,14 +1,41 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module Main where
 
-import Language.Javascript.JSaddle.Warp as JSaddle
-import Miso
-
 import DateTime
+import Miso
 import Model
-import View
 import Update
+import View
+
+#ifdef WASM
+-- WebAssembly version - no server needed
+main :: IO ()
+main = do
+  css <- readFile "cal.css"
+  let env = Env css
+
+  t <- today
+  n <- rightNow
+
+  startApp App
+    { initialAction = OnLoad
+    , model         = initialModel t n
+    , update        = updateModel
+    , view          = viewModel env
+    , events        = defaultEvents
+    , subs          = [keyboardSub keysToAction, arrowsSub arrowsToAction, every 60000 TimeUpdate]
+    , mountPoint    = Nothing
+    , logLevel      = Off
+    }
+
+-- WASM export, required when compiling w/ the WASM backend.
+foreign export javascript "hs_start" main :: IO ()
+
+#else
+-- Development version with jsaddle-warp server
+import Language.Javascript.JSaddle.Warp as JSaddle
 
 runApp :: JSM () -> IO ()
 runApp =
@@ -38,3 +65,4 @@ main = do
     , mountPoint    = Nothing -- mount point (Nothing defaults to 'body')
     , logLevel      = Off     -- used during prerendering to if VDOM/DOM in sync
     }
+#endif

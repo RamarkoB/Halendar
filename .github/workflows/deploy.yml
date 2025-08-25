@@ -1,0 +1,45 @@
+name: Deploy to GitHub Pages
+
+on:
+    push:
+        branches: [main, master]
+
+permissions:
+    contents: read
+    pages: write
+    id-token: write
+
+concurrency:
+    group: 'pages'
+    cancel-in-progress: false
+
+jobs:
+    build-and-deploy:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Setup Nix
+              uses: DeterminateSystems/nix-installer-action@main
+
+            - name: Setup Cachix
+              run: |
+                  nix-env -iA cachix -f https://cachix.org/api/v1/install
+                  cachix use haskell-miso-cachix
+
+            - name: Build with Nix
+              run: nix build
+
+            - name: Setup Pages
+              uses: actions/configure-pages@v4
+
+            - name: Upload artifact
+              uses: actions/upload-pages-artifact@v3
+              with:
+                  path: ./result
+
+            - name: Deploy to GitHub Pages
+              id: deployment
+              uses: actions/deploy-pages@v4
