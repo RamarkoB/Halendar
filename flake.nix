@@ -18,6 +18,9 @@
           name = "halendar";
           src = ./.;
 
+          # Allow network access for cabal to fetch dependencies
+          __noChroot = true;
+
           nativeBuildInputs = with pkgs; [
             nodejs_20
             git
@@ -59,14 +62,24 @@
             # Create output directory
             mkdir -p $out
             
-            # Copy the built web assets
+            # Copy the built web assets preserving directory structure
             if [ -d "dist-newstyle" ]; then
               echo "Found dist-newstyle directory"
-              find dist-newstyle -name "*.js" -o -name "*.html" -o -name "*.wasm" -o -name "*.css" -exec cp {} $out/ \;
+              # Find the actual build output directory (usually contains .wasm files)
+              outDir=$(find dist-newstyle -type d -name '*.wasm' -o -name '*.jsexe' -print -quit | xargs dirname 2>/dev/null || echo "")
+              if [ -n "$outDir" ]; then
+                echo "Found output directory: $outDir"
+                cp -r "$outDir"/* "$out"/
+              else
+                # Fallback: copy all web assets but preserve structure
+                find dist-newstyle -type f \( -name "*.js" -o -name "*.html" -o -name "*.wasm" -o -name "*.css" \) -exec cp --parents {} $out/ \;
+              fi
             fi
             
-            # Copy the CSS file
-            cp cal.css $out/
+            # Copy the CSS file if not already copied
+            if [ ! -f "$out/cal.css" ]; then
+              cp cal.css $out/
+            fi
             
             # Create index.html if it doesn't exist
             if [ ! -f "$out/index.html" ]; then

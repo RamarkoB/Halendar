@@ -13,8 +13,9 @@ import View
 -- WebAssembly version - no server needed
 main :: IO ()
 main = do
-  css <- readFile "cal.css"
-  let env = Env css
+  -- In WASM builds, CSS is loaded via <link> in index.html
+  -- We can't read from filesystem in the browser
+  let env = Env ""  -- Empty CSS string, CSS provided via <link> in index.html
 
   t <- today
   n <- rightNow

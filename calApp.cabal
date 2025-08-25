@@ -20,7 +20,7 @@ common wasm
             -DWASM
 
 executable calApp
-    import:           warnings
+    import:           warnings, wasm
     main-is:          Main.hs
     other-modules:    DateTime, Event, Model, View, Update
     build-depends:    base ^>=4.14.3.0,
