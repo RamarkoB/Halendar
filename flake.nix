@@ -19,7 +19,7 @@
           src = ./.;
 
           # Allow network access for cabal to fetch dependencies
-          __noChroot = true;
+          allowNetworking = true;
 
           nativeBuildInputs = with pkgs; [
             nodejs_20
@@ -65,8 +65,11 @@
             # Copy the built web assets preserving directory structure
             if [ -d "dist-newstyle" ]; then
               echo "Found dist-newstyle directory"
-              # Find the actual build output directory (usually contains .wasm files)
-              outDir=$(find dist-newstyle -type d -name '*.wasm' -o -name '*.jsexe' -print -quit | xargs dirname 2>/dev/null || echo "")
+              # Find a representative output file and take its directory
+              outDir="$(
+                find dist-newstyle -type f \( -name '*.wasm' -o -name 'all.js' -o -name '*.jsexe' \) -print -quit \
+                | xargs -r dirname 2>/dev/null
+              )"
               if [ -n "$outDir" ]; then
                 echo "Found output directory: $outDir"
                 cp -r "$outDir"/* "$out"/
@@ -77,8 +80,8 @@
             fi
             
             # Copy the CSS file if not already copied
-            if [ ! -f "$out/cal.css" ]; then
-              cp cal.css $out/
+            if [ ! -f "$out/cal.css" ] && [ -f "cal.css" ]; then
+              cp cal.css "$out/"
             fi
             
             # Create index.html if it doesn't exist
