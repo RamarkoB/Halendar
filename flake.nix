@@ -25,8 +25,10 @@
             nodejs_20
             git
             cacert
-            # Use miso's development environment
-            miso.packages.${system}.default
+            cabal-install
+            # Use GHC with WASM support
+            wasm32-wasi-ghc
+            wasm32-wasi-cabal
           ];
 
           buildPhase = ''
@@ -46,11 +48,11 @@
             echo "  root-keys: 07c59cb65787dedfaef5bd5f987ceb5f7e5ebf88b904bbd4c5cbdeb2ff71b740" >> $CABAL_DIR/config
             echo "  key-threshold: 3" >> $CABAL_DIR/config
             
-            # Build the Miso application for WASM
-            echo "Building Halendar with Miso for WASM deployment..."
+            # Build the Miso application for WASM using cabal
+            echo "Building Halendar with cabal for WASM deployment..."
             
-            # Use miso's build system to create the web assets
-            miso build calApp --target=wasm --one-shot
+            # Use cabal to build for WASM target
+            cabal build calApp --target=wasm32-wasi
             
             # The build should create dist-* directories with the web assets
             echo "Build completed. Looking for output files..."
