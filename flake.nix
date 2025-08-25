@@ -26,9 +26,10 @@
             git
             cacert
             cabal-install
-            # Use GHC with WASM support
-            wasm32-wasi-ghc
-            wasm32-wasi-cabal
+            # Use GHCJS for JavaScript compilation
+            ghcjs
+            # Use the miso development environment
+            miso.devShells.${system}.default
           ];
 
           buildPhase = ''
@@ -48,11 +49,11 @@
             echo "  root-keys: 07c59cb65787dedfaef5bd5f987ceb5f7e5ebf88b904bbd4c5cbdeb2ff71b740" >> $CABAL_DIR/config
             echo "  key-threshold: 3" >> $CABAL_DIR/config
             
-            # Build the Miso application for WASM using cabal
-            echo "Building Halendar with cabal for WASM deployment..."
+            # Build the Miso application using GHCJS
+            echo "Building Halendar with GHCJS for web deployment..."
             
-            # Use cabal to build for WASM target
-            cabal build calApp --target=wasm32-wasi
+            # Use cabal to build with GHCJS
+            cabal build calApp --with-compiler=ghcjs
             
             # The build should create dist-* directories with the web assets
             echo "Build completed. Looking for output files..."
@@ -67,17 +68,17 @@
             # Copy the built web assets preserving directory structure
             if [ -d "dist-newstyle" ]; then
               echo "Found dist-newstyle directory"
-              # Find a representative output file and take its directory
+              # Find GHCJS output directory
               outDir="$(
-                find dist-newstyle -type f \( -name '*.wasm' -o -name 'all.js' -o -name '*.jsexe' \) -print -quit \
+                find dist-newstyle -type f \( -name '*.jsexe' -o -name 'all.js' \) -print -quit \
                 | xargs -r dirname 2>/dev/null
               )"
               if [ -n "$outDir" ]; then
-                echo "Found output directory: $outDir"
+                echo "Found GHCJS output directory: $outDir"
                 cp -r "$outDir"/* "$out"/
               else
                 # Fallback: copy all web assets but preserve structure
-                find dist-newstyle -type f \( -name "*.js" -o -name "*.html" -o -name "*.wasm" -o -name "*.css" \) -exec cp --parents {} $out/ \;
+                find dist-newstyle -type f \( -name "*.js" -o -name "*.html" -o -name "*.jsexe" -o -name "*.css" \) -exec cp --parents {} $out/ \;
               fi
             fi
             
@@ -101,7 +102,13 @@
                 <div id="app">
                     <h1>Loading Halendar...</h1>
                 </div>
-                <script src="all.js" type="module"></script>
+                <script src="all.js"></script>
+                <script>
+                    // Initialize GHCJS application
+                    if (typeof main !== 'undefined') {
+                        main();
+                    }
+                </script>
             </body>
             </html>
             HTML_EOF

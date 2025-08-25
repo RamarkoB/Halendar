@@ -9,11 +9,11 @@ import Model
 import Update
 import View
 
-#ifdef WASM
--- WebAssembly version - no server needed
+#ifdef GHCJS
+-- GHCJS version - no server needed
 main :: IO ()
 main = do
-  -- In WASM builds, CSS is loaded via <link> in index.html
+  -- In GHCJS builds, CSS is loaded via <link> in index.html
   -- We can't read from filesystem in the browser
   let env = Env ""  -- Empty CSS string, CSS provided via <link> in index.html
 
@@ -31,8 +31,8 @@ main = do
     , logLevel      = Off
     }
 
--- WASM export, required when compiling w/ the WASM backend.
-foreign export javascript "hs_start" main :: IO ()
+-- GHCJS export, required when compiling w/ GHCJS.
+foreign export javascript "main" main :: IO ()
 
 #else
 -- Development version with jsaddle-warp server
