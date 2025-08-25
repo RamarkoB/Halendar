@@ -1,14 +1,42 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module Main where
 
-import Language.Javascript.JSaddle.Warp as JSaddle
-import Miso
-
 import DateTime
+import Miso
 import Model
-import View
 import Update
+import View
+
+#ifdef GHCJS
+-- GHCJS version - no server needed
+main :: IO ()
+main = do
+  -- In GHCJS builds, CSS is loaded via <link> in index.html
+  -- We can't read from filesystem in the browser
+  let env = Env ""  -- Empty CSS string, CSS provided via <link> in index.html
+
+  t <- today
+  n <- rightNow
+
+  startApp App
+    { initialAction = OnLoad
+    , model         = initialModel t n
+    , update        = updateModel
+    , view          = viewModel env
+    , events        = defaultEvents
+    , subs          = [keyboardSub keysToAction, arrowsSub arrowsToAction, every 60000 TimeUpdate]
+    , mountPoint    = Nothing
+    , logLevel      = Off
+    }
+
+-- GHCJS export, required when compiling w/ GHCJS.
+foreign export javascript "main" main :: IO ()
+
+#else
+-- Development version with jsaddle-warp server
+import Language.Javascript.JSaddle.Warp as JSaddle
 
 runApp :: JSM () -> IO ()
 runApp =
@@ -38,3 +66,4 @@ main = do
     , mountPoint    = Nothing -- mount point (Nothing defaults to 'body')
     , logLevel      = Off     -- used during prerendering to if VDOM/DOM in sync
     }
+#endif
